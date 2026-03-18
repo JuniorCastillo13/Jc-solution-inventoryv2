@@ -175,6 +175,12 @@ input[type=date]{color-scheme:dark;}.light input[type=date]{color-scheme:light;}
 .prod-cat-chip.active{background:var(--accent-grad);border:none;color:#fff;}
 .stock-badge{padding:3px 9px;border-radius:var(--radius-full);font-size:11px;font-weight:700;}
 .stock-ok{background:#d1fae5;color:#065f46;}.stock-low{background:#fef3c7;color:#92400e;}.stock-out{background:#fee2e2;color:#991b1b;}
+/* ── PAYMENT STATUS ── */
+.pay-pagado{background:#d1fae5;color:#065f46;}.pay-pendiente{background:#fef3c7;color:#92400e;}.pay-abono{background:#dbeafe;color:#1e40af;}
+/* ── CLIENTS ── */
+.client-avatar{width:46px;height:46px;border-radius:50%;background:var(--accent-grad);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;}
+/* ── INVENTORY ENTRIES ── */
+.entry-card{background:var(--card-solid);border-radius:var(--radius);border:1px solid var(--card-border);padding:13px 16px;margin-bottom:10px;}
 .inv-card{background:var(--card-solid);border-radius:var(--radius);border:1px solid var(--card-border);padding:14px 16px;margin-bottom:10px;cursor:pointer;}
 .inv-num{font-size:11px;color:var(--accent);font-weight:800;letter-spacing:1px;}
 .inv-client{font-size:15px;font-weight:700;margin-top:2px;}
@@ -256,11 +262,11 @@ const REPAIR_STATUS=[
 ];
 const MOVE_TYPES=["Asignación","Devolución","Reparación","Traslado","Baja","Otro"];
 const HCHIP={Asignación:"hc-asignacion",Devolución:"hc-devolucion",Reparación:"hc-reparacion",Traslado:"hc-traslado",Baja:"hc-baja",Otro:"hc-otro"};
-const NAV=[{id:"list",icon:"📦",label:"Equipos"},{id:"products",icon:"🛍️",label:"Productos"},{id:"invoices",icon:"🧾",label:"Facturas"},{id:"billing",icon:"💰",label:"Ingresos"},{id:"stats",icon:"📊",label:"Stats"}];
+const NAV=[{id:"list",icon:"📦",label:"Equipos"},{id:"products",icon:"🛍️",label:"Productos"},{id:"invoices",icon:"🧾",label:"Facturas"},{id:"clients",icon:"👥",label:"Clientes"},{id:"billing",icon:"💰",label:"Ingresos"}];
 const USERS={junior:{id:"junior",nombre:"Junior Castillo",pin:"1326",rol:"admin",ini:"JC"},bryan:{id:"bryan",nombre:"Bryan Castillo",pin:"1996",rol:"usuario",ini:"BC"}};
 
 let cu=null,lus="junior",unsubs=[];
-let S={dark:true,screen:"list",equipment:[],employees:[],history:[],products:[],invoices:[],selectedId:null,editingId:null,empDetailId:null,editingEmpId:null,selectedInvId:null,search:"",filterCat:"todos",histFilter:"todos",prodFilter:"todos",invFilter:"todos",billingPeriod:"hoy",dismissed:[],form:{},empForm:{},moveForm:{tipo:"Asignación",notas:""},prodForm:{},invForm:{tipo:"reparacion",cliente:"",telefono:"",items:[],descuento:0,notas:""},showNotif:false,showDel:false,showMove:false,showQR:false,showEmpForm:false,showUserMenu:false,showRS:false,showProdForm:false,showInvForm:false,showInvDetail:false,scanning:false,qrInput:"",loaded:{eq:false,emp:false,hist:false,prod:false,inv:false}};
+let S={dark:true,screen:"list",equipment:[],employees:[],history:[],products:[],invoices:[],clients:[],entries:[],selectedId:null,editingId:null,empDetailId:null,editingEmpId:null,selectedInvId:null,selectedClientId:null,search:"",filterCat:"todos",histFilter:"todos",prodFilter:"todos",invFilter:"todos",clientFilter:"todos",billingPeriod:"hoy",dismissed:[],form:{},empForm:{},moveForm:{tipo:"Asignación",notas:""},prodForm:{},invForm:{tipo:"reparacion",cliente:"",clienteId:null,telefono:"",items:[],descuento:0,notas:"",estadoPago:"pendiente"},entryForm:{},showNotif:false,showDel:false,showMove:false,showQR:false,showEmpForm:false,showUserMenu:false,showRS:false,showProdForm:false,showInvForm:false,showInvDetail:false,showClientForm:false,showEntryForm:false,scanning:false,qrInput:"",editingProdId:null,editingClientId:null,loaded:{eq:false,emp:false,hist:false,prod:false,inv:false,cli:false,ent:false}};
 
 window.selectLoginUser=id=>{lus=id;document.getElementById("chip-junior").classList.toggle("selected",id==="junior");document.getElementById("chip-bryan").classList.toggle("selected",id==="bryan");document.getElementById("login-pin").value="";document.getElementById("login-pin").focus();};
 window.doLogin=()=>{const pin=document.getElementById("login-pin").value.trim();const u=USERS[lus];if(pin===u.pin){cu=u;document.getElementById("login-screen").style.display="none";document.getElementById("app").style.display="flex";document.getElementById("login-error").textContent="";const p=localStorage.getItem("jcs_dark");if(p!==null)S.dark=p==="1";if(!S.dark)document.body.classList.add("light");startL();render();}else{document.getElementById("login-error").textContent="Contraseña incorrecta";document.getElementById("login-pin").value="";document.getElementById("login-pin").focus();}};
@@ -273,9 +279,11 @@ function startL(){
   const hU=onSnapshot(query(collection(db,"history"),orderBy("createdAt","desc")),s=>{S.history=s.docs.map(d=>({...d.data(),id:d.id}));S.loaded.hist=true;chkL();},e=>{console.error(e);showSync("err","Error historial");});
   const pU=onSnapshot(query(collection(db,"products"),orderBy("createdAt","asc")),s=>{S.products=s.docs.map(d=>({...d.data(),id:d.id}));S.loaded.prod=true;chkL();},e=>{console.error(e);showSync("err","Error productos");});
   const iU=onSnapshot(query(collection(db,"invoices"),orderBy("createdAt","desc")),s=>{S.invoices=s.docs.map(d=>({...d.data(),id:d.id}));S.loaded.inv=true;chkL();},e=>{console.error(e);showSync("err","Error facturas");});
-  unsubs=[eU,mpU,hU,pU,iU];
+  const cU=onSnapshot(query(collection(db,"clients"),orderBy("createdAt","asc")),s=>{S.clients=s.docs.map(d=>({...d.data(),id:d.id}));S.loaded.cli=true;chkL();},e=>{console.error(e);showSync("err","Error clientes");});
+  const nU=onSnapshot(query(collection(db,"entries"),orderBy("createdAt","desc")),s=>{S.entries=s.docs.map(d=>({...d.data(),id:d.id}));S.loaded.ent=true;chkL();},e=>{console.error(e);showSync("err","Error entradas");});
+  unsubs=[eU,mpU,hU,pU,iU,cU,nU];
 }
-function chkL(){if(S.loaded.eq&&S.loaded.emp&&S.loaded.hist&&S.loaded.prod&&S.loaded.inv){showSync("ok","Sincronizado ✓");render();}}
+function chkL(){if(S.loaded.eq&&S.loaded.emp&&S.loaded.hist&&S.loaded.prod&&S.loaded.inv&&S.loaded.cli&&S.loaded.ent){showSync("ok","Sincronizado ✓");render();}}
 
 const today=()=>new Date().toISOString().split("T")[0];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2);
@@ -326,7 +334,14 @@ function rList(){
   const cards=eq.length===0?`<div class="empty"><div style="font-size:48px">📭</div><div style="margin-top:10px">Sin resultados</div></div>`:eq.map(item=>{const ph=item.foto?`<div class="card-icon"><img src="${item.foto}" alt=""></div>`:`<div class="card-icon">${catBy(item.cat).i}</div>`;return `<div class="card fade-in" onclick="openDetail('${item.id}')">${ph}<div style="flex:1;min-width:0"><div class="card-name">${item.nombre}</div><div class="card-sub">${item.marca} · ${item.asignado}</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${sBadge(item.estado)}${item.repairStatus?rsBadge(item.repairStatus):""}</div></div><div class="card-arrow">›</div></div>`;}).join("");
   let nPanel="";
   if(S.showNotif){const items=repairs.length===0?`<div class="empty" style="padding:20px 0">✅ Sin alertas</div>`:repairs.map(e=>`<div style="background:var(--notif-bg);border:1px solid var(--notif-border);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start"><div style="font-size:24px;flex-shrink:0">${catBy(e.cat).i}</div><div style="flex:1"><div style="font-weight:700;font-size:14px">${e.nombre}</div><div style="color:var(--notif-text);font-size:12px;margin-top:2px">🔧 ${e.falla||"En reparación"}</div>${e.repairPrice?`<div style="color:#f59e0b;font-size:12px;font-weight:700;margin-top:2px">💰 ${fmtP(e.repairPrice)}</div>`:""}${e.repairStatus?`<div style="margin-top:4px">${rsBadge(e.repairStatus)}</div>`:""}</div><div style="display:flex;flex-direction:column;gap:6px"><button class="btn btn-accent" style="padding:5px 10px;font-size:11px" onclick="S.showNotif=false;openDetail('${e.id}')">Ver</button><button style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;font-family:inherit" onclick="S.dismissed.push('${e.id}');render()">Ignorar</button></div></div>`).join("");nPanel=`<div class="overlay" onclick="S.showNotif=false;render()"><div class="modal" onclick="event.stopPropagation()"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><div class="modal-title" style="margin-bottom:0">🔔 En reparación</div><button style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer" onclick="S.showNotif=false;render()">✕</button></div>${items}${repairs.length>0?`<button class="btn btn-secondary btn-full" style="margin-top:4px" onclick="S.dismissed=[...S.dismissed,...[${repairs.map(r=>`'${r.id}'`).join(",")}]];render()">Ignorar todas</button>`:""}</div></div>`;}
-  let uMenu="";if(S.showUserMenu){uMenu=`<div class="overlay" onclick="S.showUserMenu=false;render()"><div class="modal" onclick="event.stopPropagation()"><div style="display:flex;align-items:center;gap:14px;margin-bottom:20px"><div style="width:52px;height:52px;border-radius:50%;background:var(--accent-grad);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff">${cu.ini}</div><div><div style="font-size:17px;font-weight:900">${cu.nombre}</div><div style="font-size:13px;color:var(--sub);margin-top:2px">${cu.rol==="admin"?"👑 Administrador":"👤 Usuario"}</div><div style="display:flex;align-items:center;gap:5px;margin-top:4px;font-size:12px;color:#10b981;font-weight:700"><span class="online-dot"></span>Conectado · Firebase</div></div></div><div class="btn-row"><button class="btn btn-secondary" style="flex:1" onclick="S.showUserMenu=false;render()">Cancelar</button><button class="btn btn-delete" style="flex:1" onclick="S.showUserMenu=false;logout()">🚪 Cerrar sesión</button></div></div></div>`;}
+  let uMenu="";if(S.showUserMenu){uMenu=`<div class="overlay" onclick="S.showUserMenu=false;render()"><div class="modal" onclick="event.stopPropagation()"><div style="display:flex;align-items:center;gap:14px;margin-bottom:20px"><div style="width:52px;height:52px;border-radius:50%;background:var(--accent-grad);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff">${cu.ini}</div><div><div style="font-size:17px;font-weight:900">${cu.nombre}</div><div style="font-size:13px;color:var(--sub);margin-top:2px">${cu.rol==="admin"?"👑 Administrador":"👤 Usuario"}</div><div style="display:flex;align-items:center;gap:5px;margin-top:4px;font-size:12px;color:#10b981;font-weight:700"><span class="online-dot"></span>Conectado · Firebase</div></div></div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      <button class="btn btn-secondary btn-full" style="justify-content:flex-start;gap:12px" onclick="S.showUserMenu=false;setScreen('employees')"><span style="font-size:18px">👥</span>Empleados (${S.employees.filter(e=>e.activo).length} activos)</button>
+      <button class="btn btn-secondary btn-full" style="justify-content:flex-start;gap:12px" onclick="S.showUserMenu=false;setScreen('history')"><span style="font-size:18px">📋</span>Historial de movimientos</button>
+      <button class="btn btn-secondary btn-full" style="justify-content:flex-start;gap:12px" onclick="S.showUserMenu=false;setScreen('stats')"><span style="font-size:18px">📊</span>Estadísticas</button>
+      <button class="btn btn-secondary btn-full" style="justify-content:flex-start;gap:12px" onclick="toggleDark();S.showUserMenu=false"><span style="font-size:18px">${S.dark?"☀️":"🌙"}</span>${S.dark?"Modo claro":"Modo oscuro"}</button>
+    </div>
+    <div class="btn-row"><button class="btn btn-secondary" style="flex:1" onclick="S.showUserMenu=false;render()">Cancelar</button><button class="btn btn-delete" style="flex:1" onclick="S.showUserMenu=false;logout()">🚪 Cerrar sesión</button></div></div></div>`;}
   return `<div class="header"><div class="header-row"><div><div class="logo">JC SOLUTION</div><div class="title">Inventory</div><div class="subtitle">${eq.length} de ${S.equipment.length} equipos</div></div><div class="header-btns">${uPill()}${bell}<button class="btn-circle" onclick="toggleDark()">${S.dark?"☀️":"🌙"}</button><button class="btn-circle accent" onclick="openNew()">＋</button></div></div></div>${banner}<div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" placeholder="Nombre, serie, responsable..." value="${S.search}" oninput="S.search=this.value;render()"></div><div class="chips">${chps}</div><div class="export-row"><button class="export-btn" onclick="exportCSV()">📥 Exportar (${eq.length})</button></div><div class="list pb-safe">${cards}</div>${nPanel}${uMenu}`;
 }
 
@@ -413,14 +428,93 @@ function rStats(){
   </div>`;
 }
 
-function aN(){if(["detail","form"].includes(S.screen))return "list";if(S.screen==="empdetail")return "employees";if(S.screen==="invdetail")return "invoices";return S.screen;}
+function aN(){if(["detail","form"].includes(S.screen))return "list";if(S.screen==="empdetail")return "employees";if(S.screen==="invdetail")return "invoices";if(S.screen==="clientdetail")return "clients";return S.screen;}
 window.render=function(){
   if(!S.dark)document.body.classList.add("light");else document.body.classList.remove("light");
-  const sc={list:rList,detail:rDetail,form:rForm,history:rHistory,employees:rEmployees,empdetail:rEmpDetail,stats:rStats,products:rProducts,invoices:rInvoices,invdetail:rInvDetail,billing:rBilling};
+  const sc={list:rList,detail:rDetail,form:rForm,history:rHistory,employees:rEmployees,empdetail:rEmpDetail,stats:rStats,products:rProducts,invoices:rInvoices,invdetail:rInvDetail,billing:rBilling,clients:rClients,clientdetail:rClientDetail};
   document.getElementById("screen-content").innerHTML=(sc[S.screen]||rList)();
   const an=aN();
   document.getElementById("bottom-nav").innerHTML=NAV.map(n=>`<button class="nav-btn${an===n.id?" active":""}" onclick="setScreen('${n.id}')"><span class="nav-icon">${n.icon}</span>${n.label}</button>`).join("");
   document.getElementById("screen-content").scrollTop=0;
+};
+
+/* ── PAYMENT STATUS BADGE ── */
+function payBadge(s){const m={pagado:{cls:"pay-pagado",l:"✅ Pagado"},pendiente:{cls:"pay-pendiente",l:"⏳ Pendiente"},abono:{cls:"pay-abono",l:"💳 Abono"}};const x=m[s]||m.pendiente;return `<span class="inv-type ${x.cls}">${x.l}</span>`;}
+window.setPayStatus=async(invId,status)=>{const inv=S.invoices.find(i=>i.id===invId);if(!inv)return;await fsSet("invoices",invId,{...inv,estadoPago:status});showToast(`💳 Estado: ${status}`);render();};
+
+/* ── CLIENTS SCREEN ── */
+function clientInitials(nombre){return nombre.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();}
+function rClients(){
+  if(!S.loaded.cli)return rLoading();
+  const fc=S.clientFilter==="todos"?S.clients:S.clients.filter(c=>c.tipo===S.clientFilter);
+  const chps=["todos","frecuente","regular","nuevo"].map(t=>`<button class="chip${S.clientFilter===t?" active":""}" onclick="S.clientFilter='${t}';render()">${t==="todos"?"👥 Todos":t==="frecuente"?"⭐ Frecuente":t==="regular"?"👤 Regular":"🆕 Nuevo"}</button>`).join("");
+  const cards=fc.length===0?`<div class="empty"><div style="font-size:48px">📭</div><div style="margin-top:10px">Sin clientes registrados</div></div>`:fc.map(c=>{
+    const invCount=S.invoices.filter(i=>i.clienteId===c.id).length;
+    const totalSpent=S.invoices.filter(i=>i.clienteId===c.id).reduce((s,i)=>s+invTotal(i),0);
+    return `<div class="card fade-in" onclick="S.selectedClientId='${c.id}';setScreen('clientdetail')"><div class="client-avatar">${clientInitials(c.nombre)}</div><div style="flex:1;min-width:0"><div class="card-name">${c.nombre}</div><div class="card-sub">${c.telefono||"Sin teléfono"}</div><div style="font-size:12px;color:var(--accent);margin-top:3px;font-weight:700">${invCount} factura${invCount!==1?"s":""} · ${fmtP(totalSpent)}</div></div><button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;flex-shrink:0" onclick="event.stopPropagation();S.clientForm={...S.clients.find(x=>x.id==='${c.id}')};S.editingClientId='${c.id}';S.showClientForm=true;render()">✏️</button></div>`;
+  }).join("");
+  let cMod="";
+  if(S.showClientForm){
+    const f=S.clientForm||{};
+    const tipoOpts=["nuevo","regular","frecuente"].map(t=>`<option value="${t}"${f.tipo===t?" selected":""}>${t==="nuevo"?"🆕 Nuevo":t==="regular"?"👤 Regular":"⭐ Frecuente"}</option>`).join("");
+    cMod=`<div class="overlay" onclick="S.showClientForm=false;render()"><div class="modal" onclick="event.stopPropagation()"><div class="modal-title">${S.editingClientId?"Editar cliente":"Nuevo cliente"}</div>
+    <div class="field"><div class="field-label">Nombre <span class="req">*</span></div><input class="field-input" value="${f.nombre||""}" placeholder="Nombre completo" oninput="S.clientForm.nombre=this.value"></div>
+    <div class="field"><div class="field-label">Teléfono</div><input class="field-input" type="tel" inputmode="numeric" value="${f.telefono||""}" placeholder="809-000-0000" oninput="S.clientForm.telefono=this.value"></div>
+    <div class="field"><div class="field-label">Correo</div><input class="field-input" type="email" value="${f.email||""}" placeholder="correo@ejemplo.com" oninput="S.clientForm.email=this.value"></div>
+    <div class="field"><div class="field-label">Tipo de cliente</div><select class="field-select" onchange="S.clientForm.tipo=this.value">${tipoOpts}</select></div>
+    <div class="field"><div class="field-label">Notas</div><textarea class="field-textarea" placeholder="Observaciones del cliente..." oninput="S.clientForm.notas=this.value">${f.notas||""}</textarea></div>
+    <div class="btn-row"><button class="btn btn-secondary" style="flex:1" onclick="S.showClientForm=false;render()">Cancelar</button><button class="btn btn-accent" style="flex:1" onclick="saveClient()">Guardar</button></div>
+    ${S.editingClientId?`<button class="btn btn-delete btn-full" style="margin-top:8px" onclick="deleteClient('${S.editingClientId}')">🗑️ Eliminar cliente</button>`:""}
+    </div></div>`;
+  }
+  return `<div class="header"><div class="header-row"><div><div class="logo">JC SOLUTION</div><div class="title">Clientes</div><div class="subtitle">${S.clients.length} clientes registrados</div></div><div class="header-btns"><button class="btn-circle accent" onclick="S.clientForm={nombre:'',telefono:'',email:'',tipo:'nuevo',notas:''};S.editingClientId=null;S.showClientForm=true;render()">＋</button></div></div></div>
+  <div class="chips">${chps}</div>
+  <div class="list pb-safe" style="padding-top:8px">${cards}</div>${cMod}`;
+}
+window.saveClient=async()=>{
+  const f=S.clientForm;if(!f.nombre){showToast("El nombre es obligatorio","err");return;}
+  const id=S.editingClientId||uid();const ex=S.clients.find(c=>c.id===id);
+  await fsSet("clients",id,{...f,id,createdAt:ex?.createdAt||serverTimestamp()});
+  S.showClientForm=false;S.clientForm={};S.editingClientId=null;render();
+};
+window.deleteClient=async id=>{await fsDel("clients",id);S.showClientForm=false;render();};
+
+function rClientDetail(){
+  const c=S.clients.find(x=>x.id===S.selectedClientId);if(!c){setScreen("clients");return "";}
+  const cInvs=S.invoices.filter(i=>i.clienteId===c.id);
+  const totalSpent=cInvs.reduce((s,i)=>s+invTotal(i),0);
+  const pendingInvs=cInvs.filter(i=>i.estadoPago==="pendiente"||!i.estadoPago);
+  const pendingTotal=pendingInvs.reduce((s,i)=>s+invTotal(i),0);
+  const invRows=cInvs.length===0?`<div style="font-size:13px;color:var(--muted);padding:8px 0">Sin facturas</div>`:cInvs.slice(0,5).map(inv=>`<div class="info-row" style="cursor:pointer" onclick="S.selectedInvId='${inv.id}';setScreen('invdetail')"><span class="info-label">#${inv.numero||inv.id.slice(-6).toUpperCase()} · ${inv.fecha}</span><div style="display:flex;align-items:center;gap:6px">${payBadge(inv.estadoPago||"pendiente")}<span style="font-size:13px;font-weight:800;color:#10b981">${fmtP(invTotal(inv))}</span></div></div>`).join("");
+  return `<div style="background:var(--header);padding:calc(var(--safe-top)+18px) 20px 20px;border-bottom:1px solid var(--card-border)"><button class="back-btn" onclick="setScreen('clients')" style="margin-bottom:14px">‹ Volver</button><div style="display:flex;align-items:center;gap:14px"><div class="client-avatar" style="width:60px;height:60px;font-size:22px">${clientInitials(c.nombre)}</div><div><div style="font-size:20px;font-weight:900">${c.nombre}</div>${c.telefono?`<div style="font-size:13px;color:var(--sub);margin-top:2px">📞 ${c.telefono}</div>`:""} ${c.email?`<div style="font-size:12px;color:var(--muted)">${c.email}</div>`:""}</div></div></div>
+  <div style="padding:18px 20px 120px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="billing-tile"><div class="billing-tile-val" style="color:#10b981">${fmtP(totalSpent)}</div><div class="billing-tile-label">💰 Total gastado</div></div>
+      <div class="billing-tile"><div class="billing-tile-val" style="color:#f59e0b">${fmtP(pendingTotal)}</div><div class="billing-tile-label">⏳ Pendiente</div></div>
+    </div>
+    <div class="info-card"><div class="info-title">Facturas (${cInvs.length})</div>${invRows}</div>
+    ${c.notas?`<div class="info-card"><div class="info-title">Notas</div><p style="font-size:13px;color:var(--sub)">${c.notas}</p></div>`:""}
+    <div class="btn-row">
+      <button class="btn btn-accent" style="flex:1" onclick="S.invForm={tipo:'reparacion',cliente:'${c.nombre}',clienteId:'${c.id}',telefono:'${c.telefono||""}',items:[],descuento:0,notas:'',estadoPago:'pendiente'};S.showInvForm=true;setScreen('invoices')">🧾 Nueva factura</button>
+      ${c.telefono?`<a href="https://wa.me/1${c.telefono.replace(/\D/g,'')}" target="_blank" style="flex:1;text-decoration:none"><button class="btn btn-green btn-full">📱 WhatsApp</button></a>`:""}
+    </div>
+    <button class="btn btn-secondary btn-full" style="margin-top:10px" onclick="S.clientForm={...S.clients.find(x=>x.id==='${c.id}')};S.editingClientId='${c.id}';S.showClientForm=true;setScreen('clients')">✏️ Editar cliente</button>
+  </div>`;
+}
+
+/* ── INVENTORY ENTRIES SCREEN (inside Products) ── */
+window.showEntryForm=prodId=>{
+  const p=S.products.find(x=>x.id===prodId);if(!p)return;
+  S.entryForm={prodId,prodNombre:p.nombre,cantidad:1,costo:p.costo||0,notas:""};
+  S.showEntryForm=true;render();
+};
+window.saveEntry=async()=>{
+  const f=S.entryForm;if(!f.cantidad||f.cantidad<1){showToast("Ingresa una cantidad válida","err");return;}
+  const id=uid();
+  await fsSet("entries",id,{...f,id,fecha:today(),resp:cu?cu.nombre:"Admin",createdAt:serverTimestamp()});
+  const p=S.products.find(x=>x.id===f.prodId);
+  if(p){await fsSet("products",p.id,{...p,stock:(p.stock||0)+parseInt(f.cantidad),costo:f.costo||p.costo});}
+  S.showEntryForm=false;S.entryForm={};showToast(`📦 +${f.cantidad} unidades agregadas`);render();
 };
 
 /* ── PRODUCTS SCREEN ── */
@@ -430,8 +524,8 @@ function rProducts(){
   const fp=S.prodFilter==="todos"?S.products:S.products.filter(p=>p.categoria===S.prodFilter);
   const chps=["todos",...PROD_CATS].map(c=>`<button class="prod-cat-chip${S.prodFilter===c?" active":""}" onclick="S.prodFilter='${c}';render()">${c==="todos"?"🛍️ Todos":c}</button>`).join("");
   const cards=fp.length===0?`<div class="empty"><div style="font-size:48px">📭</div><div style="margin-top:10px">Sin productos</div></div>`:fp.map(p=>{
-    const stock=p.stock||0;const sb=stock===0?`<span class="stock-badge stock-out">Sin stock</span>`:stock<=5?`<span class="stock-badge stock-low">Stock bajo: ${stock}</span>`:`<span class="stock-badge stock-ok">Stock: ${stock}</span>`;
-    return `<div class="card fade-in"><div class="card-icon">${p.emoji||"📦"}</div><div style="flex:1;min-width:0"><div class="card-name">${p.nombre}</div><div class="card-sub">${p.categoria} · ${fmtP(p.precio)}</div><div style="margin-top:5px">${sb}</div></div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><button class="btn btn-secondary" style="padding:5px 10px;font-size:12px" onclick="event.stopPropagation();S.prodForm={...S.products.find(x=>x.id==='${p.id}')};S.editingProdId='${p.id}';S.showProdForm=true;render()">✏️</button><button class="btn btn-green" style="padding:5px 10px;font-size:12px" onclick="event.stopPropagation();addProdToInv('${p.id}')">＋ Venta</button></div></div>`;
+    const stock=p.stock||0;const sb=stock===0?`<span class="stock-badge stock-out">Sin stock</span>`:stock<=5?`<span class="stock-badge stock-low">⚠️ Stock bajo: ${stock}</span>`:`<span class="stock-badge stock-ok">Stock: ${stock}</span>`;
+    return `<div class="card fade-in"><div class="card-icon">${p.emoji||"📦"}</div><div style="flex:1;min-width:0"><div class="card-name">${p.nombre}</div><div class="card-sub">${p.categoria} · ${fmtP(p.precio)}</div><div style="margin-top:5px">${sb}</div></div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><button class="btn btn-secondary" style="padding:5px 10px;font-size:12px" onclick="event.stopPropagation();S.prodForm={...S.products.find(x=>x.id==='${p.id}')};S.editingProdId='${p.id}';S.showProdForm=true;render()">✏️</button><button class="btn btn-green" style="padding:5px 10px;font-size:12px" onclick="event.stopPropagation();addProdToInv('${p.id}')">＋ Venta</button><button class="btn btn-orange" style="padding:5px 10px;font-size:12px" onclick="event.stopPropagation();showEntryForm('${p.id}')">📦 Entrada</button></div></div>`;
   }).join("");
   let pMod="";
   if(S.showProdForm){
@@ -451,9 +545,23 @@ function rProducts(){
     ${S.editingProdId?`<button class="btn btn-delete btn-full" style="margin-top:8px" onclick="deleteProd('${S.editingProdId}')">🗑️ Eliminar producto</button>`:""}
     </div></div>`;
   }
+  let eMod="";
+  if(S.showEntryForm){
+    const f=S.entryForm||{};
+    const lastEntries=S.entries.filter(e=>e.prodId===f.prodId).slice(0,3);
+    const lastRows=lastEntries.length>0?lastEntries.map(e=>`<div style="font-size:12px;color:var(--sub);padding:4px 0;border-bottom:1px solid var(--row-border)">+${e.cantidad} unid. · ${e.fecha} · ${e.resp}</div>`).join(""):`<div style="font-size:12px;color:var(--muted)">Sin entradas previas</div>`;
+    eMod=`<div class="overlay" onclick="S.showEntryForm=false;render()"><div class="modal" onclick="event.stopPropagation()"><div class="modal-title">📦 Entrada de inventario</div>
+    <div style="font-size:14px;font-weight:700;margin-bottom:14px;color:var(--accent)">${f.prodNombre||""}</div>
+    <div class="field"><div class="field-label">Cantidad a agregar <span class="req">*</span></div><input class="field-input" type="number" inputmode="numeric" value="${f.cantidad||""}" placeholder="Ej. 10" oninput="S.entryForm.cantidad=parseInt(this.value)||0"></div>
+    <div class="field"><div class="field-label">Costo unitario (RD$)</div><input class="field-input" type="number" inputmode="decimal" value="${f.costo||""}" placeholder="Ej. 250" oninput="S.entryForm.costo=parseFloat(this.value)||0"></div>
+    <div class="field"><div class="field-label">Notas</div><input class="field-input" value="${f.notas||""}" placeholder="Proveedor, factura de compra..." oninput="S.entryForm.notas=this.value"></div>
+    <div class="field"><div class="field-label">Entradas recientes</div>${lastRows}</div>
+    <div class="btn-row"><button class="btn btn-secondary" style="flex:1" onclick="S.showEntryForm=false;render()">Cancelar</button><button class="btn btn-accent" style="flex:1" onclick="saveEntry()">📦 Agregar stock</button></div>
+    </div></div>`;
+  }
   return `<div class="header"><div class="header-row"><div><div class="logo">JC SOLUTION</div><div class="title">Productos</div><div class="subtitle">${S.products.length} productos registrados</div></div><div class="header-btns"><button class="btn-circle accent" onclick="S.prodForm={nombre:'',categoria:'Accesorio',precio:0,costo:0,stock:0,emoji:'📦',descripcion:''};S.editingProdId=null;S.showProdForm=true;render()">＋</button></div></div></div>
   <div class="chips">${chps}</div>
-  <div class="list pb-safe" style="padding-top:8px">${cards}</div>${pMod}`;
+  <div class="list pb-safe" style="padding-top:8px">${cards}</div>${pMod}${eMod}`;
 }
 window.saveProduct=async()=>{
   const f=S.prodForm;if(!f.nombre){showToast("El nombre es obligatorio","err");return;}
@@ -483,13 +591,17 @@ function rInvoices(){
     const tipoOpts=["reparacion","venta","mixta"].map(t=>`<option value="${t}"${f.tipo===t?" selected":""}>${t==="reparacion"?"🔧 Reparación":t==="venta"?"🛍️ Venta":"⚡ Mixta"}</option>`).join("");
     const eqOpts=`<option value="">-- Seleccionar equipo --</option>`+S.equipment.map(e=>`<option value="${e.id}">${e.nombre} · ${e.serie}</option>`).join("");
     const prodOpts=`<option value="">-- Seleccionar producto --</option>`+S.products.map(p=>`<option value="${p.id}">${p.nombre} · ${fmtP(p.precio)}</option>`).join("");
+    const clientOpts=`<option value="">-- Cliente nuevo / sin registrar --</option>`+S.clients.map(c=>`<option value="${c.id}"${f.clienteId===c.id?" selected":""}>${c.nombre}${c.telefono?" · "+c.telefono:""}</option>`).join("");
+    const payOpts=["pendiente","pagado","abono"].map(p=>`<option value="${p}"${f.estadoPago===p?" selected":""}>${p==="pendiente"?"⏳ Pendiente":p==="pagado"?"✅ Pagado":"💳 Abono"}</option>`).join("");
     const itemRows=(f.items||[]).map((it,idx)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--row-border)"><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${it.nombre}</div><div style="font-size:12px;color:var(--sub)">${fmtP(it.precio)} c/u</div></div><div style="display:flex;align-items:center;gap:6px"><button style="background:var(--btn2-solid);border:1px solid var(--btn2-border);border-radius:6px;color:var(--text);width:26px;height:26px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center" onclick="S.invForm.items[${idx}].qty=Math.max(1,S.invForm.items[${idx}].qty-1);render()">−</button><span style="font-size:14px;font-weight:700;min-width:20px;text-align:center">${it.qty}</span><button style="background:var(--btn2-solid);border:1px solid var(--btn2-border);border-radius:6px;color:var(--text);width:26px;height:26px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center" onclick="S.invForm.items[${idx}].qty+=1;render()">＋</button><button style="background:var(--del-bg);border:1px solid var(--del-border);border-radius:6px;color:var(--del-text);width:26px;height:26px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center" onclick="S.invForm.items.splice(${idx},1);render()">✕</button></div></div>`).join("");
     const subtotal=(f.items||[]).reduce((s,i)=>s+(i.precio*i.qty),0);
     const total=subtotal-(f.descuento||0);
     iMod=`<div class="overlay" onclick="S.showInvForm=false;render()"><div class="modal" onclick="event.stopPropagation()" style="max-height:92vh"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><div class="modal-title" style="margin-bottom:0">🧾 Nueva factura</div><button style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer" onclick="S.showInvForm=false;render()">✕</button></div>
     <div class="field"><div class="field-label">Tipo</div><select class="field-select" onchange="S.invForm.tipo=this.value">${tipoOpts}</select></div>
-    <div class="field"><div class="field-label">Cliente <span class="req">*</span></div><input class="field-input" value="${f.cliente||""}" placeholder="Nombre del cliente" oninput="S.invForm.cliente=this.value"></div>
+    <div class="field"><div class="field-label">Cliente registrado</div><select class="field-select" onchange="const c=S.clients.find(x=>x.id===this.value);S.invForm.clienteId=this.value||null;if(c){S.invForm.cliente=c.nombre;S.invForm.telefono=c.telefono||'';}render()">${clientOpts}</select></div>
+    <div class="field"><div class="field-label">Nombre del cliente <span class="req">*</span></div><input class="field-input" value="${f.cliente||""}" placeholder="Nombre del cliente" oninput="S.invForm.cliente=this.value"></div>
     <div class="field"><div class="field-label">Teléfono</div><input class="field-input" type="tel" inputmode="numeric" value="${f.telefono||""}" placeholder="809-000-0000" oninput="S.invForm.telefono=this.value"></div>
+    <div class="field"><div class="field-label">Estado de pago</div><select class="field-select" onchange="S.invForm.estadoPago=this.value">${payOpts}</select></div>
     ${f.tipo!=="venta"?`<div class="field"><div class="field-label">Agregar equipo (reparación)</div><select class="field-select" onchange="addEqToInv(this.value)">${eqOpts}</select></div>`:""}
     ${f.tipo!=="reparacion"?`<div class="field"><div class="field-label">Agregar producto (venta)</div><select class="field-select" onchange="addProdItemToInv(this.value)">${prodOpts}</select></div>`:""}
     <div class="field"><div class="field-label">Ítems (${(f.items||[]).length})</div>${itemRows.length?itemRows:`<div style="font-size:13px;color:var(--muted);padding:8px 0">Sin ítems agregados</div>`}</div>
@@ -531,8 +643,9 @@ function rInvDetail(){
       <div style="text-align:center;margin-top:20px;font-size:11px;color:#999">¡Gracias por su preferencia!</div>
     </div>`;
   const whatsappMsg=encodeURIComponent(`*JC SOLUTION - Factura #${inv.numero||inv.id.slice(-6).toUpperCase()}*\n\nCliente: ${inv.cliente}\nFecha: ${inv.fecha}\n\n${(inv.items||[]).map(it=>`• ${it.nombre} x${it.qty} = ${fmtP(it.precio*it.qty)}`).join("\n")}${inv.descuento?`\nDescuento: -${fmtP(inv.descuento)}`:""}\n\n*TOTAL: ${fmtP(total)}*\n\n¡Gracias por su preferencia!`);
-  return `<div style="background:var(--header);padding:calc(var(--safe-top)+18px) 20px 20px;border-bottom:1px solid var(--card-border)"><button class="back-btn" onclick="setScreen('invoices')" style="margin-bottom:14px">‹ Volver</button><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div class="inv-num">#${inv.numero||inv.id.slice(-6).toUpperCase()}</div><div style="font-size:20px;font-weight:900;margin-top:2px">${inv.cliente}</div>${inv.telefono?`<div style="font-size:13px;color:var(--sub)">📞 ${inv.telefono}</div>`:""}</div><div style="text-align:right"><div style="font-size:22px;font-weight:900;color:#10b981">${fmtP(total)}</div><div style="font-size:12px;color:var(--muted)">${inv.fecha}</div></div></div><div style="margin-top:10px">${invTypeBadge(inv.tipo)}</div></div>
+  return `<div style="background:var(--header);padding:calc(var(--safe-top)+18px) 20px 20px;border-bottom:1px solid var(--card-border)"><button class="back-btn" onclick="setScreen('invoices')" style="margin-bottom:14px">‹ Volver</button><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div class="inv-num">#${inv.numero||inv.id.slice(-6).toUpperCase()}</div><div style="font-size:20px;font-weight:900;margin-top:2px">${inv.cliente}</div>${inv.telefono?`<div style="font-size:13px;color:var(--sub)">📞 ${inv.telefono}</div>`:""}</div><div style="text-align:right"><div style="font-size:22px;font-weight:900;color:#10b981">${fmtP(total)}</div><div style="font-size:12px;color:var(--muted)">${inv.fecha}</div></div></div><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${invTypeBadge(inv.tipo)}${payBadge(inv.estadoPago||"pendiente")}</div></div>
   <div style="padding:18px 20px 120px">
+    <div class="info-card"><div class="info-title">Estado de pago</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px"><button class="btn ${(inv.estadoPago||'pendiente')==='pagado'?'btn-green':'btn-secondary'}" style="flex:1;padding:10px" onclick="setPayStatus('${inv.id}','pagado')">✅ Pagado</button><button class="btn ${(inv.estadoPago||'pendiente')==='abono'?'btn-orange':'btn-secondary'}" style="flex:1;padding:10px" onclick="setPayStatus('${inv.id}','abono')">💳 Abono</button><button class="btn ${(inv.estadoPago||'pendiente')==='pendiente'?'btn-delete':'btn-secondary'}" style="flex:1;padding:10px" onclick="setPayStatus('${inv.id}','pendiente')">⏳ Pendiente</button></div></div>
     <div class="info-card"><div class="info-title">Ítems facturados</div>${itemRows}${inv.descuento?`<div class="info-row"><span class="info-label" style="color:var(--del-text)">Descuento</span><span class="info-value" style="color:var(--del-text)">-${fmtP(inv.descuento)}</span></div>`:""}
     <div class="info-row" style="margin-top:4px"><span class="info-label" style="font-weight:800;font-size:14px">TOTAL</span><span class="info-value" style="font-size:17px;font-weight:900;color:#10b981">${fmtP(total)}</span></div></div>
     ${inv.notas?`<div class="info-card"><div class="info-title">Notas</div><p style="font-size:13px;color:var(--sub)">${inv.notas}</p></div>`:""}
